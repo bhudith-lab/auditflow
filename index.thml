@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Flow | ระบบติดตามตรวจสอบและแก้ไขข้อเสนอแนะ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+  tailwind.config = { theme: { extend: { fontFamily: { sans: ['Sarabun', 'Noto Sans Thai', 'sans-serif'] } } } };
+</script>
+<style>
+  body{font-family:'Sarabun','Noto Sans Thai',sans-serif;min-height:100vh;color:#1e293b;
+    background:linear-gradient(135deg,#fdfbf3 0%,#eef4ff 30%,#c7dcff 65%,#9ad7fb 100%);background-attachment:fixed}
+  .glass{background:rgba(255,255,255,.62);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.75);box-shadow:0 10px 35px rgba(30,64,175,.09)}
+  .glass-strong{background:rgba(255,255,255,.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.9);box-shadow:0 25px 60px rgba(15,23,42,.25)}
+  .card-hover{transition:all .3s ease}
+  .card-hover:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(30,64,175,.16)}
+  .fade-in{animation:fadeIn .35s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .nav-item{width:100%;display:flex;align-items:center;gap:.75rem;padding:.65rem .8rem;border-radius:1rem;color:#334155;text-align:left;transition:all .25s}
+  .nav-item:hover{background:rgba(255,255,255,.85);transform:translateX(4px)}
+  .nav-item.active{background:linear-gradient(90deg,#1d4ed8,#0ea5e9);color:#fff;box-shadow:0 8px 20px rgba(29,78,216,.3)}
+  .nav-item .ico{width:2.2rem;height:2.2rem;border-radius:.8rem;display:grid;place-items:center;background:rgba(219,234,254,.9);color:#1d4ed8;flex-shrink:0}
+  .nav-item.active .ico{background:rgba(255,255,255,.2);color:#fff}
+  .inp{width:100%;padding:.6rem .9rem;border-radius:.9rem;border:1px solid #cbd5e1;background:rgba(255,255,255,.85);outline:none;transition:.2s;font-size:.95rem}
+  .inp:focus{border-color:#3b82f6;box-shadow:0 0 0 4px rgba(59,130,246,.15);background:#fff}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.6rem 1.1rem;border-radius:.9rem;font-weight:600;transition:all .2s;white-space:nowrap;cursor:pointer}
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.05)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .btn-primary{background:linear-gradient(90deg,#1d4ed8,#0ea5e9);color:#fff;box-shadow:0 6px 18px rgba(29,78,216,.3)}
+  .btn-ghost{background:rgba(255,255,255,.8);color:#1e3a8a;border:1px solid #dbeafe}
+  .btn-success{background:linear-gradient(90deg,#059669,#10b981);color:#fff;box-shadow:0 6px 18px rgba(5,150,105,.3)}
+  .btn-danger{background:linear-gradient(90deg,#e11d48,#f43f5e);color:#fff;box-shadow:0 6px 18px rgba(225,29,72,.3)}
+  .icon-btn{width:2.1rem;height:2.1rem;border-radius:.7rem;display:inline-flex;align-items:center;justify-content:center;transition:.2s}
+  .icon-btn:hover{transform:scale(1.1)}
+  .tbl{width:100%;border-collapse:separate;border-spacing:0 .45rem;font-size:.92rem}
+  .tbl th{text-align:left;font-weight:600;color:#475569;padding:.4rem .9rem;white-space:nowrap;font-size:.82rem}
+  .tbl td{background:rgba(255,255,255,.78);padding:.75rem .9rem;vertical-align:top}
+  .tbl tr td:first-child{border-radius:1rem 0 0 1rem}
+  .tbl tr td:last-child{border-radius:0 1rem 1rem 0}
+  .tbl tbody tr:hover td{background:#fff}
+  .spinner{width:2.2rem;height:2.2rem;border:4px solid #bfdbfe;border-top-color:#1d4ed8;border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{transition:all .35s ease}
+  .pulse-soft{animation:pulseSoft 2.5s ease-in-out infinite}
+  @keyframes pulseSoft{0%,100%{box-shadow:0 10px 30px rgba(244,63,94,.25)}50%{box-shadow:0 10px 40px rgba(244,63,94,.5)}}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:rgba(59,130,246,.35);border-radius:8px}
+  input[type=file].inp{padding:.45rem}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginView" class="min-h-screen hidden items-center justify-center p-4">
+  <div class="w-full max-w-5xl grid lg:grid-cols-2 glass rounded-[2rem] overflow-hidden fade-in">
+    <div class="hidden lg:flex flex-col justify-between p-10 bg-gradient-to-br from-blue-800 via-blue-600 to-sky-500 text-white relative overflow-hidden">
+      <div class="absolute -top-20 -right-20 w-72 h-72 rounded-full bg-white/10"></div>
+      <div class="absolute -bottom-24 -left-16 w-80 h-80 rounded-full bg-white/10"></div>
+      <div class="relative">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-white/20 grid place-items-center text-2xl"><i class="fa-solid fa-shield-halved"></i></div>
+          <div><div class="text-2xl font-bold">Audit Flow</div><div class="text-white/80 text-sm">Internal Audit Follow-up System</div></div>
+        </div>
+        <h1 class="text-3xl font-bold mt-10 leading-snug">ระบบติดตามตรวจสอบ<br>และแก้ไขข้อเสนอแนะ</h1>
+        <p class="text-white/85 mt-3">บริหารจัดการรายงานการตรวจสอบ ติดตามผลการแก้ไข และประเมินผลได้ครบในที่เดียว</p>
+        <ul class="mt-8 space-y-3 text-white/90">
+          <li><i class="fa-solid fa-circle-check mr-2"></i>Dashboard สรุปสถานะแบบ Real-time</li>
+          <li><i class="fa-solid fa-circle-check mr-2"></i>แจ้งเตือนรายการใกล้ครบกำหนด / เกินกำหนด</li>
+          <li><i class="fa-solid fa-circle-check mr-2"></i>ประเมินผลแบบ Side-by-Side พร้อมหลักฐาน</li>
+          <li><i class="fa-solid fa-circle-check mr-2"></i>ส่งออกรายงาน PDF / Excel</li>
+        </ul>
+      </div>
+      <div class="relative text-xs text-white/70">พัฒนาโดย นายคามิน ธนากิจธิติ • Version.1</div>
+    </div>
+    <div class="p-8 md:p-12 flex flex-col justify-center">
+      <div class="lg:hidden flex items-center gap-3 mb-6">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-400 text-white grid place-items-center"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="text-xl font-bold text-blue-900">Audit Flow</div>
+      </div>
+      <h2 class="text-2xl font-bold text-slate-800">เข้าสู่ระบบ</h2>
+      <p class="text-slate-500 mt-1 mb-6">กรุณากรอกชื่อผู้ใช้และรหัสผ่าน</p>
+      <form onsubmit="doLogin(event)" class="space-y-4">
+        <label class="block"><span class="text-sm font-semibold text-slate-600">ชื่อผู้ใช้</span>
+          <div class="relative mt-1.5"><i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input id="lgUser" class="inp" style="padding-left:2.5rem" required autocomplete="username"></div></label>
+        <label class="block"><span class="text-sm font-semibold text-slate-600">รหัสผ่าน</span>
+          <div class="relative mt-1.5"><i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input id="lgPass" type="password" class="inp" style="padding-left:2.5rem" required autocomplete="current-password"></div></label>
+        <button class="btn btn-primary w-full py-3 text-base"><i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ</button>
+      </form>
+      <div class="mt-6 text-sm">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold"><i class="fa-solid fa-table"></i>เชื่อมต่อฐานข้อมูล Google Sheet</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="appView" class="hidden">
+  <aside id="sidebar" class="fixed lg:sticky top-0 left-0 z-40 h-screen w-72 shrink-0 -translate-x-full lg:translate-x-0 transition-transform duration-300 p-4">
+    <div class="glass h-full rounded-3xl flex flex-col p-4">
+      <div class="flex items-center gap-3 px-2 py-2">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-400 grid place-items-center text-white shadow-lg"><i class="fa-solid fa-shield-halved"></i></div>
+        <div><div class="font-bold text-lg text-blue-900 leading-tight">Audit Flow</div><div class="text-[11px] text-slate-500">ระบบติดตามข้อเสนอแนะ</div></div>
+        <button class="lg:hidden ml-auto text-slate-500" onclick="closeSidebar()"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      <nav id="nav" class="flex-1 overflow-y-auto space-y-1 mt-4 pr-1"></nav>
+      <div class="mt-3 rounded-2xl bg-white/70 p-3">
+        <div class="flex items-center gap-3">
+          <div id="avatar" class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-sky-400 text-white grid place-items-center font-bold"></div>
+          <div class="min-w-0"><div id="uName" class="font-semibold text-sm truncate"></div><div id="uRole" class="text-xs text-slate-500 truncate"></div></div>
+        </div>
+        <button onclick="logout()" class="btn btn-ghost w-full !py-2 text-sm text-rose-600 mt-3"><i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ</button>
+      </div>
+    </div>
+  </aside>
+  <div id="backdrop" class="fixed inset-0 bg-slate-900/30 z-30 hidden" onclick="closeSidebar()"></div>
+
+  <main class="flex-1 min-w-0 p-4 lg:p-6 flex flex-col min-h-screen">
+    <header class="glass rounded-3xl px-4 md:px-6 py-4 flex flex-wrap items-center gap-3">
+      <button class="lg:hidden icon-btn bg-blue-50 text-blue-700" onclick="openSidebar()"><i class="fa-solid fa-bars"></i></button>
+      <div class="flex-1 min-w-[180px]">
+        <h1 id="pageTitle" class="text-xl md:text-2xl font-bold text-blue-950"></h1>
+        <div id="pageSub" class="text-sm text-slate-500"></div>
+      </div>
+      <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold"><i class="fa-solid fa-table"></i>Google Sheet</span>
+      <select id="yearSel" class="inp !w-auto" onchange="state.year=this.value;renderPage()"></select>
+      <button class="btn btn-ghost" onclick="reload()" title="รีเฟรชข้อมูล"><i class="fa-solid fa-rotate"></i></button>
+    </header>
+    <section id="content" class="flex-1 mt-6"></section>
+    <footer class="mt-8 glass rounded-2xl px-5 py-3 text-xs text-slate-500 flex flex-col md:flex-row gap-1 md:justify-between">
+      <span>© Audit Flow — ระบบติดตามตรวจสอบและแก้ไขข้อเสนอแนะ</span>
+      <span>พัฒนาโดย <b class="text-slate-700">นายคามิน ธนากิจธิติ</b> • Version.1</span>
+    </footer>
+  </main>
+</div>
+
+<datalist id="unitList"></datalist>
+
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm" onclick="if(event.target===this)closeModal()">
+  <div id="modalBox"></div>
+</div>
+<!-- Loading -->
+<div id="loading" class="fixed inset-0 z-[60] hidden items-center justify-center bg-white/40 backdrop-blur-sm">
+  <div class="glass-strong rounded-3xl px-8 py-6 flex items-center gap-4"><div class="spinner"></div><span class="font-semibold text-blue-900">กำลังประมวลผล...</span></div>
+</div>
+<!-- Toasts -->
+<div id="toasts" class="fixed top-4 right-4 z-[70] space-y-3 w-[min(92vw,380px)]"></div>
+
+<script>
+/* ======================================================================
+   CONFIG — Google Apps Script Web App URL (ฐานข้อมูล Google Sheet)
+   ====================================================================== */
+const API_URL = 'https://script.google.com/macros/s/AKfycbwQEusfnNAFu04jQMRhXkdmfSaiNmQRMc59bhzvcP7S2ZkIGOaeylp0o5TzpiUIk5t_/exec';
+
+/* ---------------- Constants ---------------- */
+const STATUS_META = {
+  'อยู่ระหว่างดำเนินการ': { cls:'bg-amber-100 text-amber-700 border-amber-200', icon:'fa-spinner', color:'#f59e0b' },
+  'ส่งตรวจสอบ':          { cls:'bg-blue-100 text-blue-700 border-blue-200',   icon:'fa-paper-plane', color:'#3b82f6' },
+  'ตีกลับ':              { cls:'bg-rose-100 text-rose-700 border-rose-200',   icon:'fa-rotate-left', color:'#f43f5e' },
+  'แก้ไขเสร็จสิ้น':        { cls:'bg-emerald-100 text-emerald-700 border-emerald-200', icon:'fa-circle-check', color:'#10b981' },
+  'เกินกำหนดเวลา':        { cls:'bg-red-100 text-red-700 border-red-300',     icon:'fa-triangle-exclamation', color:'#b91c1c' },
+};
+const ROLE = {
+  admin:     { label:'Admin / ผู้ตรวจสอบ', cls:'bg-blue-100 text-blue-700' },
+  executive: { label:'ผู้บริหาร',          cls:'bg-violet-100 text-violet-700' },
+  auditee:   { label:'หน่วยรับตรวจ',       cls:'bg-teal-100 text-teal-700' },
+};
+const MENU = [
+  { id:'dashboard', label:'แดชบอร์ดหลัก',             sub:'Dashboard & Overview',              icon:'fa-chart-pie',             roles:['admin','executive','auditee'] },
+  { id:'reports',   label:'จัดการรายงานการตรวจสอบ',    sub:'Audit Reports Management',          icon:'fa-folder-open',           roles:['admin','executive'] },
+  { id:'findings',  label:'ข้อเสนอแนะและการสั่งการ',    sub:'Audit Findings & Recommendations',  icon:'fa-clipboard-list',        roles:['admin','executive'] },
+  { id:'tracking',  label:'หน่วยรับตรวจ',              sub:'Auditee Action & Tracking',         icon:'fa-list-check',            roles:['admin','auditee'] },
+  { id:'review',    label:'ติดตามและประเมินผล',         sub:'Follow-up & Review System',         icon:'fa-magnifying-glass-chart',roles:['admin'] },
+  { id:'export',    label:'รายงานและส่งออกข้อมูล',      sub:'Reporting & Exporting',             icon:'fa-file-export',           roles:['admin','executive','auditee'] },
+  { id:'users',     label:'สิทธิ์การใช้งาน',            sub:'User Roles & Permissions',          icon:'fa-user-shield',           roles:['admin'] },
+];
+const URGENT_DAYS = 30;
+
+const state = { auth:null, user:null, reports:[], findings:[], users:[], units:[], page:'dashboard', year:'', f:{}, charts:[] };
+const PAGES = {}, AFTER = {};
+
+/* ---------------- Helpers ---------------- */
+const $ = s => document.querySelector(s);
+const val = id => document.getElementById(id)?.value || '';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => /^(https?:|data:|blob:)/i.test(String(u||'')) ? u : '';
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const parseD = s => { const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2]-1, +m[3]) : null; };
+const daysLeft = s => { const d = parseD(s); return d ? Math.round((d - today())/86400000) : null; };
+const thDate = s => { const d = parseD(s); return d ? d.toLocaleDateString('th-TH',{day:'numeric',month:'short',year:'numeric'}) : '-'; };
+const thDateTime = s => { if(!s) return '-'; const d = new Date(s); return isNaN(d) ? esc(s) : d.toLocaleString('th-TH',{dateStyle:'medium',timeStyle:'short'}); };
+const currentFY = () => { const d = new Date(); return String(d.getFullYear() + 543 + (d.getMonth() >= 9 ? 1 : 0)); };
+const role = () => state.user?.role;
+const isAdmin = () => role() === 'admin';
+const isExec = () => role() === 'executive';
+const getF = id => state.findings.find(f => f.id === id) || {};
+const reportOf = id => state.reports.find(r => r.id === id) || {};
+const H = f => Array.isArray(f.history) ? f.history : (() => { try { return JSON.parse(f.history || '[]'); } catch { return []; } })();
+const isActive = u => u.active !== false && String(u.active).toUpperCase() !== 'FALSE';
+
+const effStatus = f => {
+  const s = f.status || 'อยู่ระหว่างดำเนินการ', n = daysLeft(f.dueDate);
+  return (['อยู่ระหว่างดำเนินการ','ตีกลับ'].includes(s) && n !== null && n < 0) ? 'เกินกำหนดเวลา' : s;
+};
+const countBy = fs => fs.reduce((a,f) => (a[effStatus(f)] = (a[effStatus(f)]||0)+1, a), {});
+const urgentList = fs => fs.filter(f => !['แก้ไขเสร็จสิ้น','ส่งตรวจสอบ'].includes(f.status) && daysLeft(f.dueDate) !== null && daysLeft(f.dueDate) <= URGENT_DAYS)
+                           .sort((a,b) => daysLeft(a.dueDate) - daysLeft(b.dueDate));
+const scopedReports = () => state.reports.filter(r => !state.year || String(r.fiscalYear) === String(state.year));
+const scopedFindings = () => state.findings.filter(f => !state.year || String(reportOf(f.reportId).fiscalYear) === String(state.year))
+                                           .sort((a,b) => String(a.dueDate).localeCompare(String(b.dueDate)));
+
+const badge = st => `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${STATUS_META[st]?.cls||''}"><i class="fa-solid ${STATUS_META[st]?.icon||''}"></i>${esc(st)}</span>`;
+const countdown = f => {
+  if (f.status === 'แก้ไขเสร็จสิ้น') return '<span class="text-emerald-600 text-xs font-semibold"><i class="fa-solid fa-lock mr-1"></i>ปิดประเด็นแล้ว</span>';
+  const n = daysLeft(f.dueDate); if (n === null) return '';
+  if (n < 0)  return `<span class="inline-block px-2 py-0.5 rounded-lg bg-red-600 text-white text-xs font-semibold">เกิน ${-n} วัน</span>`;
+  if (n === 0) return `<span class="inline-block px-2 py-0.5 rounded-lg bg-orange-500 text-white text-xs font-semibold">ครบกำหนดวันนี้</span>`;
+  if (n <= URGENT_DAYS) return `<span class="inline-block px-2 py-0.5 rounded-lg bg-orange-100 text-orange-700 text-xs font-semibold">เหลือ ${n} วัน</span>`;
+  return `<span class="text-slate-500 text-xs">เหลือ ${n} วัน</span>`;
+};
+const box = (t, txt, c='slate') => `<div class="rounded-2xl p-3 bg-${c}-50/80 border border-${c}-100"><div class="text-xs font-semibold text-${c}-700 mb-1">${t}</div><div class="text-slate-700 whitespace-pre-line text-sm">${esc(txt) || '-'}</div></div>`;
+const field = (label, inner, cls='') => `<label class="block ${cls}"><span class="block text-sm font-semibold text-slate-600 mb-1.5">${label}</span>${inner}</label>`;
+const ib = (icon, title, onclick, c='blue') => `<button title="${title}" onclick="${onclick}" class="icon-btn bg-${c}-50 text-${c}-600 hover:bg-${c}-100"><i class="fa-solid ${icon}"></i></button>`;
+const empty = msg => `<div class="text-center py-14 text-slate-400"><i class="fa-regular fa-folder-open text-5xl mb-3"></i><div>${msg}</div></div>`;
+const evLink = (url, name) => safeUrl(url)
+  ? `<a href="${esc(safeUrl(url))}" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 text-sm hover:bg-blue-100 max-w-full"><i class="fa-solid fa-paperclip"></i><span class="truncate">${esc(name || 'เปิดหลักฐาน')}</span></a>`
+  : (name ? `<span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-sm"><i class="fa-solid fa-file"></i>${esc(name)}</span>` : '<span class="text-slate-400 text-sm">ไม่มีไฟล์แนบ</span>');
+const unitOptions = (sel='') => state.units.map(u => `<option ${u===sel?'selected':''}>${esc(u)}</option>`).join('');
+const statusOptions = (sel='') => Object.keys(STATUS_META).map(s => `<option ${s===sel?'selected':''}>${s}</option>`).join('');
+const searchBox = (id, ph, fn) => `<div class="relative flex-1"><i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i><input id="${id}" class="inp" style="padding-left:2.4rem" placeholder="${ph}" oninput="${fn}()"></div>`;
+
+/* ---------------- UI utils ---------------- */
+let loadingCount = 0;
+function showLoading(on) {
+  loadingCount = Math.max(0, loadingCount + (on ? 1 : -1));
+  const el = $('#loading'); el.classList.toggle('hidden', !loadingCount); el.classList.toggle('flex', !!loadingCount);
+}
+function toast(msg, type='success') {
+  const c = { success:'from-emerald-500 to-teal-500', error:'from-rose-500 to-red-500', info:'from-blue-600 to-sky-500', warn:'from-amber-500 to-orange-500' }[type];
+  const i = { success:'fa-circle-check', error:'fa-circle-xmark', info:'fa-circle-info', warn:'fa-bell' }[type];
+  const el = document.createElement('div');
+  el.className = `toast bg-gradient-to-r ${c} text-white rounded-2xl shadow-xl px-4 py-3 flex items-start gap-3 opacity-0 translate-x-8`;
+  el.innerHTML = `<i class="fa-solid ${i} text-lg mt-0.5"></i><div class="flex-1 text-sm font-medium">${esc(msg)}</div><button onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>`;
+  $('#toasts').appendChild(el);
+  requestAnimationFrame(() => el.classList.remove('opacity-0','translate-x-8'));
+  setTimeout(() => { el.classList.add('opacity-0','translate-x-8'); setTimeout(() => el.remove(), 350); }, 4500);
+}
+function openModal(html, size='max-w-2xl') {
+  const box = $('#modalBox');
+  box.className = `glass-strong rounded-3xl w-full ${size} max-h-[92vh] overflow-y-auto p-6 md:p-8 relative fade-in`;
+  box.innerHTML = `<button onclick="closeModal()" class="absolute top-4 right-4 icon-btn bg-slate-100 text-slate-500 hover:bg-slate-200"><i class="fa-solid fa-xmark"></i></button>${html}`;
+  $('#modal').classList.remove('hidden'); $('#modal').classList.add('flex');
+}
+function closeModal() { $('#modal').classList.add('hidden'); $('#modal').classList.remove('flex'); }
+function openSidebar() { $('#sidebar').classList.remove('-translate-x-full'); $('#backdrop').classList.remove('hidden'); }
+function closeSidebar() { $('#sidebar').classList.add('-translate-x-full'); $('#backdrop').classList.add('hidden'); }
+const modalHead = (icon, title, sub='') => `<div class="flex items-center gap-3 mb-5 pr-10"><div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-400 text-white grid place-items-center shadow"><i class="fa-solid ${icon}"></i></div><div><h3 class="text-xl font-bold text-blue-950">${title}</h3>${sub?`<div class="text-sm text-slate-500">${sub}</div>`:''}</div></div>`;
+const formBtns = (label='บันทึกข้อมูล') => `<div class="flex justify-end gap-2 pt-2"><button type="button" class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button><button class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> ${label}</button></div>`;
+
+/* ---------------- API layer (Google Sheet) ---------------- */
+async function api(action, payload = {}) {
+  const body = { action, auth: state.auth, ...payload };
+  let res;
+  try {
+    res = await fetch(API_URL, { method:'POST', headers:{ 'Content-Type':'text/plain;charset=utf-8' }, body: JSON.stringify(body) });
+  } catch (e) {
+    throw new Error('ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาตรวจสอบอินเทอร์เน็ต');
+  }
+  let j;
+  try { j = await res.json(); }
+  catch (e) { throw new Error('เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง (ตรวจสอบการ Deploy Web App ให้สิทธิ์ "Anyone")'); }
+  if (!j.ok) throw new Error(j.error || 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
+  return j.data;
+}
+async function run(fn) {
+  showLoading(true);
+  try { return await fn(); }
+  catch (e) { console.error(e); toast(e.message || 'เกิดข้อผิดพลาด', 'error'); return null; }
+  finally { showLoading(false); }
+}
+async function uploadFile(file) {
+  if (file.size > 10 * 1024 * 1024) throw new Error('ขนาดไฟล์ต้องไม่เกิน 10MB');
+  const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+  return api('uploadFile', { data: { name:file.name, mimeType:file.type || 'application/octet-stream', data } });
+}
+
+/* ---------------- Auth & bootstrap ---------------- */
+function showLogin() {
+  $('#appView').className = 'hidden';
+  $('#loginView').classList.remove('hidden'); $('#loginView').classList.add('flex');
+}
+async function doLogin(e) {
+  e.preventDefault();
+  state.auth = { username: $('#lgUser').value.trim(), password: $('#lgPass').value };
+  const u = await run(() => api('login'));
+  if (!u) { state.auth = null; return; }
+  state.user = u;
+  sessionStorage.setItem('af_auth', JSON.stringify(state.auth));
+  await enterApp();
+  toast(`ยินดีต้อนรับ ${u.name}`, 'success');
+}
+async function enterApp() {
+  await loadData();
+  $('#loginView').classList.add('hidden'); $('#loginView').classList.remove('flex');
+  $('#appView').className = 'flex min-h-screen';
+  $('#uName').textContent = state.user.name;
+  $('#uRole').textContent = `${ROLE[role()]?.label || role()} • ${state.user.unit || ''}`;
+  $('#avatar').textContent = (state.user.name || '?').trim().charAt(0);
+  state.page = role() === 'auditee' ? 'tracking' : 'dashboard';
+  renderNav(); renderPage(); loginAlerts();
+}
+function logout() {
+  sessionStorage.removeItem('af_auth');
+  Object.assign(state, { auth:null, user:null, reports:[], findings:[], users:[], f:{} });
+  $('#lgPass').value = ''; showLogin();
+}
+async function loadData() {
+  const d = await run(() => api('getAll'));
+  if (!d) return;
+  state.reports = d.reports || []; state.findings = d.findings || []; state.users = d.users || [];
+  state.units = [...new Set([...(d.units || []), ...state.findings.map(f => f.unit), ...state.reports.map(r => r.unit)].filter(Boolean))].sort();
+  $('#unitList').innerHTML = state.units.map(u => `<option value="${esc(u)}">`).join('');
+  const years = [...new Set(state.reports.map(r => String(r.fiscalYear)).filter(Boolean))].sort().reverse();
+  if (state.year && !years.includes(state.year)) state.year = '';
+  $('#yearSel').innerHTML = `<option value="">ทุกปีงบประมาณ</option>` + years.map(y => `<option value="${y}" ${y===state.year?'selected':''}>ปีงบประมาณ ${y}</option>`).join('');
+}
+async function reload() { await loadData(); renderNav(); renderPage(); }
+function loginAlerts() {
+  const u = urgentList(state.findings), over = u.filter(f => daysLeft(f.dueDate) < 0).length, near = u.length - over;
+  const rej = state.findings.filter(f => f.status === 'ตีกลับ').length, pend = state.findings.filter(f => f.status === 'ส่งตรวจสอบ').length;
+  if (role() === 'executive') { if (over) toast(`มีข้อเสนอแนะเกินกำหนด ${over} รายการ`, 'error'); return; }
+  if (over) toast(`มีข้อเสนอแนะเกินกำหนดเวลา ${over} รายการ`, 'error');
+  if (near) toast(`มีรายการใกล้ครบกำหนดภายใน ${URGENT_DAYS} วัน ${near} รายการ`, 'warn');
+  if (rej && role() === 'auditee') toast(`มีประเด็นถูกตีกลับให้แก้ไข ${rej} รายการ`, 'warn');
+  if (pend && isAdmin()) toast(`มีผลการแก้ไขรอประเมิน ${pend} รายการ`, 'info');
+}
+
+/* ---------------- Navigation ---------------- */
+function go(page, filters) { state.page = page; if (filters) Object.assign(state.f, filters); renderNav(); renderPage(); closeSidebar(); window.scrollTo({ top:0, behavior:'smooth' }); }
+function renderNav() {
+  const pend = state.findings.filter(f => f.status === 'ส่งตรวจสอบ').length;
+  const act = state.findings.filter(f => ['ตีกลับ','เกินกำหนดเวลา'].includes(effStatus(f))).length;
+  $('#nav').innerHTML = MENU.filter(m => m.roles.includes(role())).map(m => {
+    const n = m.id === 'review' ? pend : m.id === 'tracking' ? act : 0;
+    return `<button onclick="go('${m.id}')" class="nav-item ${state.page===m.id?'active':''}">
+      <span class="ico"><i class="fa-solid ${m.icon}"></i></span>
+      <span class="flex-1 min-w-0"><span class="block text-sm font-semibold truncate">${m.label}</span><span class="block text-[11px] opacity-70 truncate">${m.sub}</span></span>
+      ${n ? `<span class="min-w-[1.4rem] h-6 px-1.5 rounded-full bg-rose-500 text-white text-xs grid place-items-center">${n}</span>` : ''}</button>`;
+  }).join('');
+}
+function renderPage() {
+  state.charts.forEach(c => c.destroy()); state.charts = [];
+  let m = MENU.find(x => x.id === state.page);
+  if (!m || !m.roles.includes(role())) { m = MENU.find(x => x.roles.includes(role())); state.page = m.id; }
+  $('#pageTitle').textContent = m.label; $('#pageSub').textContent = m.sub;
+  $('#content').innerHTML = `<div class="fade-in">${PAGES[state.page]()}</div>`;
+  AFTER[state.page]?.();
+}
+
+/* ======================================================================
+   1) DASHBOARD
+   ====================================================================== */
+PAGES.dashboard = () => {
+  const fs = scopedFindings(), rs = scopedReports(), c = countBy(fs);
+  const total = fs.length, done = c['แก้ไขเสร็จสิ้น'] || 0, pct = total ? Math.round(done * 100 / total) : 0;
+  const urgent = urgentList(fs), over = urgent.filter(f => daysLeft(f.dueDate) < 0).length;
+  const cards = [
+    ['รายงานการตรวจสอบ', rs.length, 'fa-folder-open', 'from-blue-600 to-sky-500', 'ฉบับ'],
+    ['ข้อเสนอแนะทั้งหมด', total, 'fa-clipboard-list', 'from-indigo-600 to-blue-500', 'ประเด็น'],
+    ['แก้ไขเสร็จสิ้น', done, 'fa-circle-check', 'from-emerald-500 to-teal-400', `${pct}% ของทั้งหมด`],
+    ['อยู่ระหว่างดำเนินการ', c['อยู่ระหว่างดำเนินการ'] || 0, 'fa-spinner', 'from-amber-500 to-yellow-400', 'ประเด็น'],
+    ['ส่งตรวจสอบ', c['ส่งตรวจสอบ'] || 0, 'fa-paper-plane', 'from-sky-500 to-cyan-400', 'รอประเมินผล'],
+    ['ตีกลับ / เกินกำหนด', `${c['ตีกลับ']||0} / ${c['เกินกำหนดเวลา']||0}`, 'fa-triangle-exclamation', 'from-rose-500 to-red-400', 'ต้องเร่งดำเนินการ'],
+  ];
+  return `
+  ${urgent.length ? `<div class="mb-6 rounded-3xl p-4 md:p-5 bg-gradient-to-r from-rose-500 to-orange-400 text-white flex flex-col md:flex-row md:items-center gap-4 pulse-soft">
+    <div class="w-12 h-12 rounded-2xl bg-white/20 grid place-items-center text-2xl shrink-0"><i class="fa-solid fa-bell"></i></div>
+    <div class="flex-1"><div class="font-bold text-lg">แจ้งเตือนเร่งด่วน (Urgent Alerts)</div>
+    <div class="text-white/90 text-sm">เกินกำหนดเวลา <b>${over}</b> รายการ • ใกล้ครบกำหนดภายใน ${URGENT_DAYS} วัน <b>${urgent.length - over}</b> รายการ</div></div>
+    <button class="btn bg-white text-rose-600" onclick="document.getElementById('urgentBox').scrollIntoView({behavior:'smooth'})">ดูรายการ <i class="fa-solid fa-arrow-down"></i></button></div>` : ''}
+  <div class="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4">
+    ${cards.map(([t,v,ic,g,sub]) => `<div class="glass rounded-3xl p-5 card-hover">
+      <div class="flex items-start justify-between gap-2"><div class="text-sm text-slate-500">${t}</div>
+      <div class="w-11 h-11 rounded-2xl bg-gradient-to-br ${g} text-white grid place-items-center shadow-md shrink-0"><i class="fa-solid ${ic}"></i></div></div>
+      <div class="text-3xl font-bold text-slate-800 mt-1">${v}</div><div class="text-xs text-slate-400 mt-1">${sub}</div></div>`).join('')}
+  </div>
+  <div class="grid lg:grid-cols-3 gap-6 mt-6">
+    <div class="glass rounded-3xl p-6">
+      <h3 class="font-bold text-blue-950 mb-4"><i class="fa-solid fa-chart-pie text-blue-600 mr-2"></i>สัดส่วนสถานะการดำเนินงาน</h3>
+      <div class="relative h-64"><canvas id="chStatus"></canvas></div>
+      <div class="mt-5"><div class="flex justify-between text-sm mb-1"><span class="text-slate-600">ความสำเร็จในการแก้ไข</span><b class="text-emerald-600">${pct}%</b></div>
+      <div class="h-3 rounded-full bg-slate-200 overflow-hidden"><div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700" style="width:${pct}%"></div></div></div>
+    </div>
+    <div class="glass rounded-3xl p-6 lg:col-span-2">
+      <h3 class="font-bold text-blue-950 mb-4"><i class="fa-solid fa-chart-column text-blue-600 mr-2"></i>สถานะข้อเสนอแนะแยกตามหน่วยรับตรวจ</h3>
+      <div class="relative h-80"><canvas id="chUnit"></canvas></div>
+    </div>
+  </div>
+  <div id="urgentBox" class="glass rounded-3xl p-6 mt-6">
+    <h3 class="font-bold text-blue-950 mb-4"><i class="fa-solid fa-hourglass-half text-rose-500 mr-2"></i>รายการใกล้ครบกำหนด (${URGENT_DAYS} วัน) / เกินกำหนดแก้ไข</h3>
+    ${urgent.length ? `<div class="space-y-3">${urgent.map(f => `<div onclick="openDetail('${f.id}')" class="cursor-pointer rounded-2xl bg-white/75 hover:bg-white p-4 flex flex-col md:flex-row md:items-center gap-3 transition card-hover">
+      <div class="w-14 text-center shrink-0"><div class="text-2xl font-bold ${daysLeft(f.dueDate)<0?'text-red-600':'text-orange-500'}">${Math.abs(daysLeft(f.dueDate))}</div><div class="text-[11px] text-slate-500">${daysLeft(f.dueDate)<0?'วันที่เกิน':'วันที่เหลือ'}</div></div>
+      <div class="flex-1 min-w-0"><div class="font-semibold text-blue-900">${esc(f.code)} <span class="font-normal text-slate-500 text-sm">• ${esc(f.unit)}</span></div><div class="text-sm text-slate-600 truncate">${esc(f.finding)}</div></div>
+      <div class="text-sm text-slate-500 whitespace-nowrap"><i class="fa-regular fa-calendar mr-1"></i>${thDate(f.dueDate)}</div>${badge(effStatus(f))}</div>`).join('')}</div>`
+      : empty('ไม่มีรายการเร่งด่วน 🎉')}
+  </div>`;
+};
+AFTER.dashboard = () => {
+  const fs = scopedFindings(), c = countBy(fs), labels = Object.keys(STATUS_META);
+  state.charts.push(new Chart($('#chStatus'), { type:'doughnut',
+    data:{ labels, datasets:[{ data:labels.map(l => c[l]||0), backgroundColor:labels.map(l => STATUS_META[l].color), borderWidth:3, borderColor:'#fff', hoverOffset:10 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8, font:{ size:11 } } } } } }));
+  const units = [...new Set(fs.map(f => f.unit))];
+  const by = (u, fn) => fs.filter(f => f.unit === u && fn(effStatus(f))).length;
+  const ds = (label, fn, color) => ({ label, data:units.map(u => by(u, fn)), backgroundColor:color, borderRadius:8, maxBarThickness:48 });
+  state.charts.push(new Chart($('#chUnit'), { type:'bar',
+    data:{ labels:units, datasets:[
+      ds('แก้ไขเสร็จสิ้น', s => s === 'แก้ไขเสร็จสิ้น', '#10b981'),
+      ds('อยู่ระหว่างดำเนินการ', s => s === 'อยู่ระหว่างดำเนินการ', '#f59e0b'),
+      ds('ส่งตรวจสอบ', s => s === 'ส่งตรวจสอบ', '#3b82f6'),
+      ds('ตีกลับ', s => s === 'ตีกลับ', '#f43f5e'),
+      ds('เกินกำหนดเวลา', s => s === 'เกินกำหนดเวลา', '#b91c1c') ] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ stacked:true, grid:{ display:false } }, y:{ stacked:true, beginAtZero:true, ticks:{ precision:0 } } },
+      plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8 } } } } }));
+};
+
+/* ======================================================================
+   2) AUDIT REPORTS MANAGEMENT
+   ====================================================================== */
+PAGES.reports = () => `
+  <div class="glass rounded-3xl p-5 mb-5 flex flex-col md:flex-row gap-3 md:items-center">
+    ${searchBox('rq', 'ค้นหาเลขที่หนังสือ / ชื่อเรื่อง', 'renderReportsTable')}
+    <select id="ru" class="inp md:!w-64" onchange="renderReportsTable()"><option value="">ทุกหน่วยรับตรวจ</option>${unitOptions()}</select>
+    ${isAdmin() ? `<button class="btn btn-primary" onclick="openReportForm()"><i class="fa-solid fa-plus"></i> สร้างรายงานใหม่</button>` : ''}
+  </div>
+  <div class="glass rounded-3xl p-3 md:p-5 overflow-x-auto"><div id="tblWrap"></div></div>`;
+AFTER.reports = () => renderReportsTable();
+function renderReportsTable() {
+  const q = val('rq').toLowerCase(), u = val('ru');
+  const list = scopedReports().filter(r => (!u || r.unit === u) && (!q || `${r.docNo} ${r.title}`.toLowerCase().includes(q)));
+  $('#tblWrap').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>เลขที่หนังสือ</th><th>ชื่อเรื่อง</th><th>ปีงบประมาณ</th><th>หน่วยรับตรวจ</th><th>วันที่รายงาน</th><th>ความคืบหน้า</th><th>ไฟล์รายงาน</th><th class="text-right">จัดการ</th></tr></thead><tbody>
+  ${list.map(r => {
+    const fs = state.findings.filter(f => f.reportId === r.id), done = fs.filter(f => f.status === 'แก้ไขเสร็จสิ้น').length, p = fs.length ? Math.round(done*100/fs.length) : 0;
+    return `<tr><td class="font-semibold text-blue-900 whitespace-nowrap">${esc(r.docNo)}</td><td class="min-w-[240px]">${esc(r.title)}</td><td>${esc(r.fiscalYear)}</td>
+      <td class="whitespace-nowrap">${esc(r.unit)}</td><td class="whitespace-nowrap">${thDate(r.auditDate)}</td>
+      <td class="min-w-[140px]"><div class="text-xs text-slate-500 mb-1">${done}/${fs.length} ประเด็น (${p}%)</div><div class="h-2 rounded-full bg-slate-200"><div class="h-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400" style="width:${p}%"></div></div></td>
+      <td>${safeUrl(r.fileUrl) ? `<a href="${esc(safeUrl(r.fileUrl))}" target="_blank" rel="noopener" class="text-rose-600 hover:underline text-sm whitespace-nowrap"><i class="fa-solid fa-file-pdf mr-1"></i>${esc(r.fileName || 'เปิดไฟล์')}</a>` : '<span class="text-slate-300">-</span>'}</td>
+      <td class="text-right whitespace-nowrap space-x-1">
+        ${ib('fa-list','ดูข้อเสนอแนะ',`go('findings',{reportId:'${r.id}'})`)}
+        ${isAdmin() ? ib('fa-plus','เพิ่มข้อเสนอแนะ',`state.f.reportId='${r.id}';openFindingForm()`,'emerald') + ib('fa-pen','แก้ไข',`openReportForm('${r.id}')`,'amber') + ib('fa-trash','ลบ',`delReport('${r.id}')`,'rose') : ''}
+      </td></tr>`; }).join('')}</tbody></table>` : empty('ยังไม่มีรายงานการตรวจสอบ');
+}
+function openReportForm(id) {
+  const r = id ? reportOf(id) : { fiscalYear: currentFY() };
+  openModal(`${modalHead('fa-folder-plus', id ? 'แก้ไขรายงานการตรวจสอบ' : 'สร้างรายงานการตรวจสอบใหม่', 'Audit Report')}
+  <form onsubmit="saveReport(event,'${id||''}')" class="space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+      ${field('เลขที่หนังสือ *', `<input name="docNo" required class="inp" value="${esc(r.docNo)}" placeholder="เช่น ตส 0001/2570">`)}
+      ${field('ประจำปีงบประมาณ *', `<input name="fiscalYear" required class="inp" type="number" min="2500" max="2700" value="${esc(r.fiscalYear)}">`)}
+      ${field('ชื่อเรื่อง *', `<input name="title" required class="inp" value="${esc(r.title)}">`, 'md:col-span-2')}
+      ${field('หน่วยรับตรวจ *', `<input name="unit" required list="unitList" class="inp" value="${esc(r.unit)}">`)}
+      ${field('วันที่รายงาน', `<input name="auditDate" type="date" class="inp" value="${esc(r.auditDate)}">`)}
+      ${field('อัปโหลดไฟล์รายงาน (PDF ≤10MB)', `<input name="file" type="file" accept="application/pdf" class="inp">${r.fileUrl ? `<div class="mt-2">${evLink(r.fileUrl, r.fileName)}</div>` : ''}`, 'md:col-span-2')}
+    </div>${formBtns()}</form>`, 'max-w-2xl');
+}
+async function saveReport(e, id) {
+  e.preventDefault();
+  const fm = e.target, data = Object.fromEntries(new FormData(fm)); delete data.file; data.id = id;
+  const file = fm.file.files[0];
+  const ok = await run(async () => {
+    if (file) { const up = await uploadFile(file); data.fileUrl = up.url; data.fileName = up.name; }
+    return api('saveReport', { data });
+  });
+  if (ok) { closeModal(); toast('บันทึกรายงานเรียบร้อย'); await reload(); }
+}
+async function delReport(id) {
+  const n = state.findings.filter(f => f.reportId === id).length;
+  if (!confirm(`ยืนยันการลบรายงานนี้?\n(ข้อเสนอแนะที่เกี่ยวข้อง ${n} รายการจะถูกลบด้วย)`)) return;
+  if (await run(() => api('deleteReport', { data:{ id } }))) { toast('ลบรายงานเรียบร้อย'); await reload(); }
+}
+
+/* ======================================================================
+   3) FINDINGS & RECOMMENDATIONS
+   ====================================================================== */
+PAGES.findings = () => `
+  <div class="glass rounded-3xl p-5 mb-5 space-y-3">
+    <div class="flex flex-col md:flex-row gap-3">
+      ${searchBox('fq', 'ค้นหารหัส / สิ่งที่ตรวจพบ / ข้อเสนอแนะ', 'renderFindingsTable')}
+      ${isAdmin() ? `<button class="btn btn-primary" onclick="openFindingForm()"><i class="fa-solid fa-plus"></i> ลงทะเบียนข้อเสนอแนะ</button>` : ''}
+    </div>
+    <div class="grid md:grid-cols-3 gap-3">
+      <select id="fr" class="inp" onchange="renderFindingsTable()"><option value="">ทุกรายงาน</option>${scopedReports().map(r => `<option value="${r.id}" ${r.id===state.f.reportId?'selected':''}>${esc(r.docNo)} - ${esc(r.title)}</option>`).join('')}</select>
+      <select id="fu" class="inp" onchange="renderFindingsTable()"><option value="">ทุกหน่วยรับตรวจ</option>${unitOptions()}</select>
+      <select id="fs" class="inp" onchange="renderFindingsTable()"><option value="">ทุกสถานะ</option>${statusOptions()}</select>
+    </div>
+  </div>
+  <div class="glass rounded-3xl p-3 md:p-5 overflow-x-auto"><div class="px-2 text-sm text-slate-500">พบ <b id="fcount">0</b> รายการ</div><div id="tblWrap"></div></div>`;
+AFTER.findings = () => renderFindingsTable();
+function renderFindingsTable() {
+  const q = val('fq').toLowerCase(), u = val('fu'), s = val('fs'), rid = val('fr'); state.f.reportId = rid;
+  const list = scopedFindings().filter(f => (!u || f.unit === u) && (!s || effStatus(f) === s) && (!rid || f.reportId === rid)
+    && (!q || [f.code, f.finding, f.recommendation, f.directive].join(' ').toLowerCase().includes(q)));
+  $('#fcount').textContent = list.length;
+  $('#tblWrap').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>รหัส</th><th>หน่วยรับตรวจ</th><th>สิ่งที่ตรวจพบ (Finding)</th><th>ข้อเสนอแนะ</th><th>ข้อสั่งการผู้บริหาร</th><th>กำหนดเสร็จ</th><th>สถานะ</th><th class="text-right">จัดการ</th></tr></thead><tbody>
+  ${list.map(f => `<tr>
+    <td class="font-semibold text-blue-900 whitespace-nowrap">${esc(f.code)}<div class="text-xs text-slate-400 font-normal">${esc(reportOf(f.reportId).docNo || '')}</div></td>
+    <td class="whitespace-nowrap">${esc(f.unit)}</td>
+    <td class="min-w-[220px]"><div class="line-clamp-2">${esc(f.finding)}</div></td>
+    <td class="min-w-[220px]"><div class="line-clamp-2">${esc(f.recommendation)}</div></td>
+    <td class="min-w-[160px]">${f.directive ? `<div class="line-clamp-2 text-violet-700">${esc(f.directive)}</div>` : '<span class="text-slate-300">-</span>'}</td>
+    <td class="whitespace-nowrap">${thDate(f.dueDate)}<div class="mt-1">${countdown(f)}</div></td>
+    <td>${badge(effStatus(f))}</td>
+    <td class="text-right whitespace-nowrap space-x-1">${ib('fa-eye','รายละเอียด',`openDetail('${f.id}')`)}
+      ${isExec() ? ib('fa-gavel','บันทึกข้อสั่งการ',`openDirectiveForm('${f.id}')`,'violet') : ''}
+      ${isAdmin() ? ib('fa-pen','แก้ไข',`openFindingForm('${f.id}')`,'amber') + ib('fa-trash','ลบ',`delFinding('${f.id}')`,'rose') : ''}</td></tr>`).join('')}
+  </tbody></table>` : empty('ไม่พบข้อมูลข้อเสนอแนะ');
+}
+function openFindingForm(id) {
+  const f = id ? getF(id) : { reportId: state.f.reportId || '', unit: reportOf(state.f.reportId).unit || '' };
+  const nextCode = 'F-' + String(state.findings.length + 1).padStart(3, '0');
+  openModal(`${modalHead('fa-clipboard-list', id ? 'แก้ไขข้อเสนอแนะ' : 'ลงทะเบียนข้อเสนอแนะและการสั่งการ', 'Audit Findings & Recommendations')}
+  <form onsubmit="saveFinding(event,'${id||''}')" class="space-y-4">
+    ${field('รายงานการตรวจสอบ *', `<select name="reportId" required class="inp" onchange="const o=this.selectedOptions[0];if(o&&o.dataset.unit)this.form.unit.value=o.dataset.unit">
+      <option value="">-- เลือกรายงาน --</option>${state.reports.map(r => `<option value="${r.id}" data-unit="${esc(r.unit)}" ${r.id===f.reportId?'selected':''}>${esc(r.docNo)} - ${esc(r.title)}</option>`).join('')}</select>`)}
+    <div class="grid md:grid-cols-3 gap-4">
+      ${field('รหัสข้อตรวจพบ *', `<input name="code" required class="inp" value="${esc(f.code || nextCode)}">`)}
+      ${field('หน่วยรับตรวจ *', `<input name="unit" required list="unitList" class="inp" value="${esc(f.unit)}">`)}
+      ${field('กำหนดระยะเวลา (Due Date) *', `<input name="dueDate" type="date" required class="inp" value="${esc(f.dueDate)}">`)}
+    </div>
+    ${field('รายละเอียดข้อบกพร่อง / สิ่งที่ตรวจพบ (Finding) *', `<textarea name="finding" rows="3" required class="inp">${esc(f.finding)}</textarea>`)}
+    ${field('ข้อเสนอแนะของหน่วยตรวจสอบภายใน (Recommendation) *', `<textarea name="recommendation" rows="3" required class="inp">${esc(f.recommendation)}</textarea>`)}
+    ${field('ข้อสั่งการของผู้บริหาร', `<textarea name="directive" rows="2" class="inp">${esc(f.directive)}</textarea>`)}
+    ${id ? field('สถานะการดำเนินงาน', `<select name="status" class="inp">${['อยู่ระหว่างดำเนินการ','ส่งตรวจสอบ','ตีกลับ','แก้ไขเสร็จสิ้น'].map(s => `<option ${s===f.status?'selected':''}>${s}</option>`).join('')}</select>`) : ''}
+    ${formBtns()}</form>`, 'max-w-3xl');
+}
+async function saveFinding(e, id) {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target)); data.id = id;
+  if (await run(() => api('saveFinding', { data }))) { closeModal(); toast('บันทึกข้อเสนอแนะเรียบร้อย'); await reload(); }
+}
+async function delFinding(id) {
+  if (!confirm('ยืนยันการลบข้อเสนอแนะนี้?')) return;
+  if (await run(() => api('deleteFinding', { data:{ id } }))) { toast('ลบข้อเสนอแนะเรียบร้อย'); await reload(); }
+}
+function openDirectiveForm(id) {
+  const f = getF(id);
+  openModal(`${modalHead('fa-gavel', 'บันทึกข้อสั่งการของผู้บริหาร', `${esc(f.code)} • ${esc(f.unit)}`)}
+  <form onsubmit="saveDirective(event,'${id}')" class="space-y-4">
+    ${box('สิ่งที่ตรวจพบ', f.finding)} ${box('ข้อเสนอแนะ', f.recommendation, 'blue')}
+    ${field('ข้อสั่งการของผู้บริหาร *', `<textarea name="directive" rows="4" required class="inp">${esc(f.directive)}</textarea>`)}
+    ${formBtns('บันทึกข้อสั่งการ')}</form>`, 'max-w-2xl');
+}
+async function saveDirective(e, id) {
+  e.preventDefault();
+  if (await run(() => api('saveFinding', { data:{ id, directive: e.target.directive.value.trim() } }))) { closeModal(); toast('บันทึกข้อสั่งการเรียบร้อย'); await reload(); }
+}
+function openDetail(id) {
+  const f = getF(id), r = reportOf(f.reportId);
+  openModal(`${modalHead('fa-file-lines', `รายละเอียดข้อเสนอแนะ ${esc(f.code)}`, `${esc(r.docNo || '')} ${esc(r.title || '')}`)}
+  <div class="flex flex-wrap items-center gap-3 mb-4">${badge(effStatus(f))}<span class="text-sm text-slate-600"><i class="fa-solid fa-building mr-1"></i>${esc(f.unit)}</span>
+    <span class="text-sm text-slate-600"><i class="fa-regular fa-calendar mr-1"></i>กำหนด ${thDate(f.dueDate)}</span>${countdown(f)}</div>
+  <div class="grid md:grid-cols-2 gap-3">
+    ${box('รายละเอียดข้อบกพร่อง / สิ่งที่ตรวจพบ', f.finding)} ${box('ข้อเสนอแนะของหน่วยตรวจสอบภายใน', f.recommendation, 'blue')}
+    ${box('ข้อสั่งการของผู้บริหาร', f.directive, 'violet')} ${box('คำชี้แจง / ผลการแก้ไข', f.response, 'emerald')}
+    ${f.reviewComment ? box('ความเห็นผู้ตรวจสอบ', f.reviewComment, 'rose') : ''}
+    <div class="rounded-2xl p-3 bg-white/80 border border-slate-100"><div class="text-xs font-semibold text-slate-600 mb-2">ไฟล์แนบ / เอกสารหลักฐาน</div>${evLink(f.evidenceUrl, f.evidenceName)}</div>
+  </div>
+  <h4 class="font-bold text-blue-950 mt-6 mb-3"><i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i>ประวัติการดำเนินการ</h4>${timeline(H(f))}`, 'max-w-4xl');
+}
+function timeline(h) {
+  if (!h.length) return '<div class="text-sm text-slate-400">ยังไม่มีประวัติ</div>';
+  return `<ol class="border-l-2 border-blue-100 ml-2 space-y-4">${h.slice().reverse().map(x => `<li class="relative pl-5">
+    <span class="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-100"></span>
+    <div class="text-sm font-semibold text-slate-700">${esc(x.action)}</div><div class="text-xs text-slate-400">${thDateTime(x.at)} • ${esc(x.by)}</div>
+    ${x.note ? `<div class="text-sm text-slate-600 mt-1 bg-white/80 rounded-xl p-2 whitespace-pre-line">${esc(x.note)}</div>` : ''}</li>`).join('')}</ol>`;
+}
+
+/* ======================================================================
+   4) AUDITEE ACTION & TRACKING
+   ====================================================================== */
+PAGES.tracking = () => `
+  ${role() === 'auditee' ? `<div class="glass rounded-3xl p-5 mb-5 flex items-center gap-4"><div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-sky-400 text-white grid place-items-center text-xl"><i class="fa-solid fa-building"></i></div>
+    <div><div class="font-bold text-blue-950">${esc(state.user.unit)}</div><div class="text-sm text-slate-500">บันทึกคำชี้แจง ผลการแก้ไข และแนบหลักฐานตามข้อเสนอแนะ</div></div></div>` : ''}
+  <div class="glass rounded-3xl p-5 mb-5 flex flex-col md:flex-row gap-3">
+    ${searchBox('tq', 'ค้นหารหัส / ประเด็น', 'renderTracking')}
+    ${isAdmin() ? `<select id="tu" class="inp md:!w-60" onchange="renderTracking()"><option value="">ทุกหน่วยรับตรวจ</option>${unitOptions()}</select>` : ''}
+    <select id="ts" class="inp md:!w-56" onchange="renderTracking()"><option value="">ทุกสถานะ</option>${statusOptions()}</select>
+  </div>
+  <div id="trackWrap" class="grid md:grid-cols-2 2xl:grid-cols-3 gap-5"></div>`;
+AFTER.tracking = () => renderTracking();
+function renderTracking() {
+  const q = val('tq').toLowerCase(), u = val('tu'), s = val('ts');
+  const prio = { 'ตีกลับ':0, 'เกินกำหนดเวลา':1, 'อยู่ระหว่างดำเนินการ':2, 'ส่งตรวจสอบ':3, 'แก้ไขเสร็จสิ้น':4 };
+  const list = scopedFindings().filter(f => (!u || f.unit === u) && (!s || effStatus(f) === s) && (!q || `${f.code} ${f.finding} ${f.recommendation}`.toLowerCase().includes(q)))
+    .sort((a,b) => prio[effStatus(a)] - prio[effStatus(b)] || String(a.dueDate).localeCompare(String(b.dueDate)));
+  $('#trackWrap').innerHTML = list.length ? list.map(f => {
+    const st = effStatus(f), canEdit = !['แก้ไขเสร็จสิ้น','ส่งตรวจสอบ'].includes(f.status);
+    return `<div class="glass rounded-3xl p-5 card-hover flex flex-col ${st==='เกินกำหนดเวลา'?'ring-2 ring-red-300':st==='ตีกลับ'?'ring-2 ring-rose-300':''}">
+      <div class="flex items-start justify-between gap-2"><div><div class="text-xs text-slate-400">${esc(reportOf(f.reportId).docNo || '')}</div>
+        <div class="font-bold text-blue-900 text-lg">${esc(f.code)}</div><div class="text-sm text-slate-500"><i class="fa-solid fa-building mr-1"></i>${esc(f.unit)}</div></div>${badge(st)}</div>
+      <div class="mt-3 flex flex-wrap items-center gap-3 text-sm"><span class="text-slate-500"><i class="fa-regular fa-calendar mr-1"></i>กำหนด ${thDate(f.dueDate)}</span>${countdown(f)}</div>
+      <div class="mt-3 space-y-2 flex-1">
+        ${box('สิ่งที่ตรวจพบ', f.finding)} ${box('ข้อเสนอแนะ', f.recommendation, 'blue')}
+        ${f.directive ? box('ข้อสั่งการผู้บริหาร', f.directive, 'violet') : ''}
+        ${f.status === 'ตีกลับ' && f.reviewComment ? box('<i class="fa-solid fa-rotate-left mr-1"></i>เหตุผลการตีกลับจากผู้ตรวจสอบ', f.reviewComment, 'rose') : ''}
+        ${f.response ? box('คำชี้แจง / ผลการแก้ไขล่าสุด', f.response, 'emerald') : ''}
+      </div>
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-2"><div class="min-w-0">${evLink(f.evidenceUrl, f.evidenceName)}</div>
+        <div class="flex gap-2">${ib('fa-clock-rotate-left','ประวัติ',`openDetail('${f.id}')`,'slate')}
+        ${canEdit ? `<button class="btn btn-primary !py-2" onclick="openActionForm('${f.id}')"><i class="fa-solid fa-pen-to-square"></i> บันทึกผลการแก้ไข</button>` : ''}</div></div>
+    </div>`; }).join('') : `<div class="md:col-span-2 2xl:col-span-3 glass rounded-3xl">${empty('ไม่พบรายการข้อเสนอแนะ')}</div>`;
+}
+function openActionForm(id) {
+  const f = getF(id);
+  openModal(`${modalHead('fa-pen-to-square', 'บันทึกผลการแก้ไขตามข้อเสนอแนะ', `${esc(f.code)} • ${esc(f.unit)} • กำหนด ${thDate(f.dueDate)}`)}
+  <form onsubmit="submitAction(event,'${id}')" class="space-y-4">
+    ${box('ข้อเสนอแนะ', f.recommendation, 'blue')}
+    ${f.status === 'ตีกลับ' ? box('เหตุผลการตีกลับ', f.reviewComment, 'rose') : ''}
+    ${field('คำชี้แจง / ผลการบันทึกแก้ไขตามข้อเสนอแนะ *', `<textarea name="response" rows="5" required class="inp">${esc(f.response)}</textarea>`)}
+    ${field('สถานะการดำเนินงาน *', `<select name="status" class="inp"><option>อยู่ระหว่างดำเนินการ</option><option>ส่งตรวจสอบ</option></select>`)}
+    <div class="grid md:grid-cols-2 gap-4">
+      ${field('อัปโหลดเอกสารหลักฐาน (≤10MB)', `<input name="file" type="file" class="inp">`)}
+      ${field('หรือ วางลิงก์หลักฐาน (Evidence Link)', `<input name="evidenceUrl" class="inp" value="${esc(f.evidenceUrl)}" placeholder="https://drive.google.com/...">`)}
+    </div>
+    ${f.evidenceUrl || f.evidenceName ? `<div class="text-sm text-slate-600">หลักฐานเดิม: ${evLink(f.evidenceUrl, f.evidenceName)}</div>` : ''}
+    <div class="rounded-2xl bg-amber-50 border border-amber-100 p-3 text-sm text-amber-800"><i class="fa-solid fa-circle-info mr-1"></i>เลือก <b>"ส่งตรวจสอบ"</b> เมื่อแก้ไขเสร็จและพร้อมให้ผู้ตรวจสอบประเมินผล ระบบจะแจ้งเตือนผู้ตรวจสอบโดยอัตโนมัติ</div>
+    ${formBtns('บันทึก')}</form>`, 'max-w-2xl');
+}
+async function submitAction(e, id) {
+  e.preventDefault();
+  const fm = e.target, f = getF(id), file = fm.file.files[0], link = fm.evidenceUrl.value.trim(), status = fm.status.value;
+  if (status === 'ส่งตรวจสอบ' && !file && !link && !f.evidenceName && !confirm('ยังไม่ได้แนบหลักฐาน ต้องการส่งตรวจสอบต่อหรือไม่?')) return;
+  const data = { id, response: fm.response.value.trim(), status, evidenceUrl: link, evidenceName: link === (f.evidenceUrl || '') ? (f.evidenceName || '') : (link ? 'ลิงก์หลักฐาน' : '') };
+  const ok = await run(async () => {
+    if (file) { const up = await uploadFile(file); data.evidenceUrl = up.url; data.evidenceName = up.name; }
+    return api('submitAction', { data });
+  });
+  if (ok) { closeModal(); toast(status === 'ส่งตรวจสอบ' ? 'ส่งผลการแก้ไขเพื่อตรวจสอบเรียบร้อย' : 'บันทึกความคืบหน้าเรียบร้อย'); await reload(); }
+}
+
+/* ======================================================================
+   5) FOLLOW-UP & REVIEW SYSTEM
+   ====================================================================== */
+PAGES.review = () => {
+  const fs = scopedFindings(), pend = fs.filter(f => f.status === 'ส่งตรวจสอบ');
+  const recent = fs.filter(f => ['แก้ไขเสร็จสิ้น','ตีกลับ'].includes(f.status)).sort((a,b) => String(b.updatedAt||'').localeCompare(String(a.updatedAt||''))).slice(0, 10);
+  const stat = (t, v, ic, g) => `<div class="glass rounded-3xl p-5 flex items-center gap-4 card-hover"><div class="w-12 h-12 rounded-2xl bg-gradient-to-br ${g} text-white grid place-items-center text-xl"><i class="fa-solid ${ic}"></i></div><div><div class="text-sm text-slate-500">${t}</div><div class="text-2xl font-bold">${v}</div></div></div>`;
+  return `<div class="grid md:grid-cols-3 gap-4 mb-6">
+    ${stat('รอประเมินผล', pend.length, 'fa-hourglass-half', 'from-blue-600 to-sky-400')}
+    ${stat('ปิดประเด็นแล้ว', fs.filter(f => f.status === 'แก้ไขเสร็จสิ้น').length, 'fa-circle-check', 'from-emerald-500 to-teal-400')}
+    ${stat('ตีกลับให้แก้ไข', fs.filter(f => f.status === 'ตีกลับ').length, 'fa-rotate-left', 'from-rose-500 to-orange-400')}</div>
+  <h3 class="font-bold text-blue-950 text-lg mb-3"><i class="fa-solid fa-inbox mr-2 text-blue-600"></i>รายการรอประเมินผล</h3>
+  <div class="grid lg:grid-cols-2 gap-5">${pend.length ? pend.map(f => `<div class="glass rounded-3xl p-5 card-hover">
+    <div class="flex justify-between gap-2"><div><div class="font-bold text-blue-900">${esc(f.code)}</div><div class="text-sm text-slate-500">${esc(f.unit)} • ส่งเมื่อ ${thDateTime(f.submittedAt)}</div></div>${badge(f.status)}</div>
+    <div class="grid sm:grid-cols-2 gap-2 mt-3">${box('ข้อเสนอแนะ', f.recommendation, 'blue')}${box('คำชี้แจงที่ส่งมา', f.response, 'emerald')}</div>
+    <div class="mt-4 flex justify-between items-center gap-2">${evLink(f.evidenceUrl, f.evidenceName)}<button class="btn btn-primary" onclick="openReview('${f.id}')"><i class="fa-solid fa-scale-balanced"></i> ประเมินผล</button></div></div>`).join('')
+    : `<div class="lg:col-span-2 glass rounded-3xl">${empty('ไม่มีรายการรอประเมินผล')}</div>`}</div>
+  <div class="glass rounded-3xl p-5 mt-6 overflow-x-auto"><h3 class="font-bold text-blue-950 mb-2"><i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i>ผลการประเมินล่าสุด</h3>
+  ${recent.length ? `<table class="tbl"><thead><tr><th>รหัส</th><th>หน่วยรับตรวจ</th><th>ความเห็นผู้ตรวจสอบ</th><th>วันที่</th><th>ผล</th><th></th></tr></thead><tbody>${recent.map(f => `<tr>
+    <td class="font-semibold text-blue-900">${esc(f.code)}</td><td>${esc(f.unit)}</td><td class="min-w-[220px]">${esc(f.reviewComment) || '-'}</td><td class="whitespace-nowrap">${thDateTime(f.updatedAt)}</td><td>${badge(f.status)}</td>
+    <td>${ib('fa-eye','รายละเอียด',`openDetail('${f.id}')`)}</td></tr>`).join('')}</tbody></table>` : empty('ยังไม่มีผลการประเมิน')}</div>`;
+};
+function openReview(id) {
+  const f = getF(id);
+  openModal(`${modalHead('fa-scale-balanced', `ประเมินผลการแก้ไข: ${esc(f.code)}`, `${esc(f.unit)} • Side-by-Side View`)}
+  <div class="grid md:grid-cols-2 gap-5">
+    <div class="rounded-3xl bg-white/80 border border-slate-200 p-5 space-y-3">
+      <div class="font-bold text-slate-700"><i class="fa-solid fa-file-lines text-blue-600 mr-2"></i>ข้อเสนอแนะเดิม / สิ่งที่ตรวจพบ</div>
+      ${box('สิ่งที่ตรวจพบ (Finding)', f.finding)} ${box('ข้อเสนอแนะ (Recommendation)', f.recommendation, 'blue')}
+      ${f.directive ? box('ข้อสั่งการผู้บริหาร', f.directive, 'violet') : ''}
+      <div class="text-sm text-slate-500"><i class="fa-regular fa-calendar mr-1"></i>กำหนดเสร็จ ${thDate(f.dueDate)} ${countdown(f)}</div>
+    </div>
+    <div class="rounded-3xl bg-emerald-50/70 border border-emerald-200 p-5 space-y-3">
+      <div class="font-bold text-emerald-800"><i class="fa-solid fa-file-circle-check mr-2"></i>หลักฐานการแก้ไขที่หน่วยรับตรวจส่งมา</div>
+      ${box('คำชี้แจง', f.response, 'emerald')}
+      <div class="rounded-2xl p-3 bg-white/80 border border-emerald-100"><div class="text-xs font-semibold text-emerald-700 mb-2">หลักฐานแนบ</div>${evLink(f.evidenceUrl, f.evidenceName)}</div>
+      <div class="text-sm text-slate-500"><i class="fa-solid fa-paper-plane mr-1"></i>ส่งเมื่อ ${thDateTime(f.submittedAt)}</div>
+    </div>
+  </div>
+  <div class="mt-5">${field('ความเห็นของผู้ตรวจสอบ (จำเป็นเมื่อตีกลับ)', `<textarea id="rvComment" rows="3" class="inp" placeholder="ระบุความเห็น / เหตุผล"></textarea>`)}</div>
+  <div class="flex flex-col sm:flex-row justify-end gap-2 mt-4">
+    <button class="btn btn-danger" onclick="doReview('${id}','reject')"><i class="fa-solid fa-rotate-left"></i> ตีกลับ (Reject/Revise)</button>
+    <button class="btn btn-success" onclick="doReview('${id}','approve')"><i class="fa-solid fa-circle-check"></i> อนุมัติ / ปิดประเด็น (Close Issue)</button></div>
+  <details class="mt-6"><summary class="cursor-pointer font-semibold text-blue-900">ประวัติการดำเนินการ</summary><div class="mt-3">${timeline(H(f))}</div></details>`, 'max-w-6xl');
+}
+async function doReview(id, decision) {
+  const comment = $('#rvComment').value.trim();
+  if (decision === 'reject' && !comment) return toast('กรุณาระบุเหตุผลการตีกลับ', 'warn');
+  if (!confirm(decision === 'approve' ? 'ยืนยันอนุมัติและปิดประเด็นนี้?' : 'ยืนยันตีกลับให้หน่วยรับตรวจแก้ไข?')) return;
+  if (await run(() => api('review', { data:{ id, decision, comment } }))) {
+    closeModal(); toast(decision === 'approve' ? 'ปิดประเด็นเรียบร้อย' : 'ตีกลับเรียบร้อย ระบบแจ้งเตือนหน่วยรับตรวจแล้ว', decision === 'approve' ? 'success' : 'warn'); await reload();
+  }
+}
+
+/* ======================================================================
+   6) REPORTING & EXPORTING
+   ====================================================================== */
+PAGES.export = () => `
+  <div class="glass rounded-3xl p-5 mb-5"><div class="flex flex-col lg:flex-row gap-3 lg:items-end">
+    ${field('หน่วยรับตรวจ', `<select id="eu" class="inp" onchange="renderExport()"><option value="">ทุกหน่วยรับตรวจ</option>${unitOptions()}</select>`, 'flex-1')}
+    ${field('สถานะ', `<select id="es" class="inp" onchange="renderExport()"><option value="">ทุกสถานะ</option>${statusOptions()}</select>`, 'flex-1')}
+    <div class="flex flex-wrap gap-2">
+      <button class="btn btn-success" onclick="exportExcel()"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx)</button>
+      <button class="btn btn-danger" onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+      <button class="btn btn-ghost" onclick="printReport()"><i class="fa-solid fa-print"></i> พิมพ์รายงาน</button></div></div></div>
+  <div class="glass rounded-3xl p-5 mb-5 overflow-x-auto"><h3 class="font-bold text-blue-950 mb-2"><i class="fa-solid fa-table mr-2 text-blue-600"></i>สรุปผลแยกตามหน่วยรับตรวจ</h3><div id="sumWrap"></div></div>
+  <div class="glass rounded-3xl p-5 overflow-x-auto"><h3 class="font-bold text-blue-950 mb-2"><i class="fa-solid fa-list mr-2 text-blue-600"></i>รายละเอียดข้อเสนอแนะ (<span id="expCount">0</span> รายการ)</h3><div id="expWrap"></div></div>`;
+AFTER.export = () => renderExport();
+const exportList = () => scopedFindings().filter(f => (!val('eu') || f.unit === val('eu')) && (!val('es') || effStatus(f) === val('es')));
+function unitSummary(list) {
+  const m = {};
+  list.forEach(f => { const s = effStatus(f), o = m[f.unit] ||= { unit:f.unit, total:0, done:0, prog:0, sub:0, rej:0, over:0 };
+    o.total++; o[{ 'แก้ไขเสร็จสิ้น':'done', 'อยู่ระหว่างดำเนินการ':'prog', 'ส่งตรวจสอบ':'sub', 'ตีกลับ':'rej', 'เกินกำหนดเวลา':'over' }[s]]++; });
+  const rows = Object.values(m).map(o => ({ ...o, pct: o.total ? Math.round(o.done*100/o.total) : 0 }));
+  const t = rows.reduce((a,o) => { ['total','done','prog','sub','rej','over'].forEach(k => a[k] += o[k]); return a; }, { unit:'รวมทั้งสิ้น', total:0, done:0, prog:0, sub:0, rej:0, over:0 });
+  t.pct = t.total ? Math.round(t.done*100/t.total) : 0;
+  return { rows, total:t };
+}
+function renderExport() {
+  const list = exportList(), { rows, total } = unitSummary(list);
+  $('#expCount').textContent = list.length;
+  const tr = (o, b='') => `<tr class="${b}"><td>${esc(o.unit)}</td><td class="text-center">${o.total}</td><td class="text-center text-emerald-600">${o.done}</td><td class="text-center text-amber-600">${o.prog}</td><td class="text-center text-blue-600">${o.sub}</td><td class="text-center text-rose-600">${o.rej}</td><td class="text-center text-red-700">${o.over}</td><td class="text-center font-bold">${o.pct}%</td></tr>`;
+  $('#sumWrap').innerHTML = rows.length ? `<table class="tbl"><thead><tr><th>หน่วยรับตรวจ</th><th class="text-center">ทั้งหมด</th><th class="text-center">เสร็จสิ้น</th><th class="text-center">ดำเนินการ</th><th class="text-center">ส่งตรวจสอบ</th><th class="text-center">ตีกลับ</th><th class="text-center">เกินกำหนด</th><th class="text-center">% สำเร็จ</th></tr></thead><tbody>${rows.map(o => tr(o)).join('')}${tr(total, 'font-bold')}</tbody></table>` : empty('ไม่มีข้อมูล');
+  $('#expWrap').innerHTML = list.length ? `<table class="tbl"><thead><tr><th>#</th><th>รหัส</th><th>หน่วยรับตรวจ</th><th>สิ่งที่ตรวจพบ</th><th>ข้อเสนอแนะ</th><th>กำหนดเสร็จ</th><th>สถานะ</th></tr></thead><tbody>${list.map((f,i) => `<tr><td>${i+1}</td><td class="font-semibold text-blue-900 whitespace-nowrap">${esc(f.code)}</td><td class="whitespace-nowrap">${esc(f.unit)}</td><td class="min-w-[220px]"><div class="line-clamp-2">${esc(f.finding)}</div></td><td class="min-w-[220px]"><div class="line-clamp-2">${esc(f.recommendation)}</div></td><td class="whitespace-nowrap">${thDate(f.dueDate)}</td><td>${badge(effStatus(f))}</td></tr>`).join('')}</tbody></table>` : empty('ไม่มีข้อมูล');
+}
+const stamp = () => ymd(new Date());
+function exportExcel() {
+  const list = exportList(); if (!list.length) return toast('ไม่มีข้อมูลสำหรับส่งออก', 'warn');
+  const { rows, total } = unitSummary(list), wb = XLSX.utils.book_new();
+  const sum = [...rows, total].map(o => ({ 'หน่วยรับตรวจ':o.unit, 'ทั้งหมด':o.total, 'แก้ไขเสร็จสิ้น':o.done, 'อยู่ระหว่างดำเนินการ':o.prog, 'ส่งตรวจสอบ':o.sub, 'ตีกลับ':o.rej, 'เกินกำหนดเวลา':o.over, 'ร้อยละความสำเร็จ':o.pct }));
+  const ws1 = XLSX.utils.json_to_sheet(sum); ws1['!cols'] = [{wch:30},{wch:10},{wch:14},{wch:18},{wch:12},{wch:10},{wch:14},{wch:16}];
+  const det = list.map((f,i) => { const r = reportOf(f.reportId); return { 'ลำดับ':i+1, 'รหัสข้อตรวจพบ':f.code, 'เลขที่หนังสือ':r.docNo||'', 'ชื่อเรื่อง':r.title||'', 'ประจำปีงบประมาณ':r.fiscalYear||'', 'หน่วยรับตรวจ':f.unit,
+    'รายละเอียดข้อบกพร่อง/สิ่งที่ตรวจพบ (Finding)':f.finding, 'ข้อเสนอแนะ (Recommendation)':f.recommendation, 'ข้อสั่งการของผู้บริหาร':f.directive||'', 'กำหนดระยะเวลา (Due Date)':thDate(f.dueDate),
+    'จำนวนวันคงเหลือ':f.status==='แก้ไขเสร็จสิ้น'?'':daysLeft(f.dueDate), 'คำชี้แจง/ผลการแก้ไข':f.response||'', 'หลักฐาน (Evidence Link)':String(f.evidenceUrl||'').startsWith('data:')?(f.evidenceName||''):(f.evidenceUrl||f.evidenceName||''), 'สถานะการดำเนินงาน':effStatus(f), 'ความเห็นผู้ตรวจสอบ':f.reviewComment||'' }; });
+  const ws2 = XLSX.utils.json_to_sheet(det); ws2['!cols'] = [{wch:6},{wch:12},{wch:16},{wch:35},{wch:10},{wch:24},{wch:50},{wch:50},{wch:35},{wch:16},{wch:10},{wch:45},{wch:35},{wch:18},{wch:35}];
+  const rep = scopedReports().map(r => ({ 'เลขที่หนังสือ':r.docNo, 'ชื่อเรื่อง':r.title, 'ประจำปีงบประมาณ':r.fiscalYear, 'หน่วยรับตรวจ':r.unit, 'วันที่รายงาน':thDate(r.auditDate), 'จำนวนข้อเสนอแนะ':state.findings.filter(f => f.reportId === r.id).length, 'ไฟล์รายงาน':String(r.fileUrl||'').startsWith('data:')?(r.fileName||''):(r.fileUrl||'') }));
+  const ws3 = XLSX.utils.json_to_sheet(rep); ws3['!cols'] = [{wch:16},{wch:45},{wch:10},{wch:26},{wch:16},{wch:14},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'สรุปตามหน่วยงาน');
+  XLSX.utils.book_append_sheet(wb, ws2, 'รายละเอียดข้อเสนอแนะ');
+  XLSX.utils.book_append_sheet(wb, ws3, 'รายงานการตรวจสอบ');
+  XLSX.writeFile(wb, `AuditFlow_Report_${stamp()}.xlsx`);
+  toast('ดาวน์โหลดไฟล์ Excel เรียบร้อย');
+}
+function buildReportHTML(list) {
+  const { rows, total } = unitSummary(list);
+  const th = 'background:#1d4ed8;color:#fff;padding:6px 8px;border:1px solid #1e40af;font-weight:600;text-align:center';
+  const td = 'padding:6px 8px;border:1px solid #cbd5e1;vertical-align:top';
+  const sr = o => `<tr><td style="${td}">${esc(o.unit)}</td>${['total','done','prog','sub','rej','over'].map(k => `<td style="${td};text-align:center">${o[k]}</td>`).join('')}<td style="${td};text-align:center;font-weight:700">${o.pct}%</td></tr>`;
+  return `<div style="font-family:Sarabun,'Noto Sans Thai',sans-serif;color:#1e293b;padding:8px;width:1040px;font-size:13px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1d4ed8;padding-bottom:8px;margin-bottom:14px">
+      <div><div style="font-size:22px;font-weight:700;color:#1e3a8a">รายงานสรุปผลการติดตามการแก้ไขตามข้อเสนอแนะ</div>
+      <div style="font-size:14px;color:#475569">ประจำปีงบประมาณ ${esc(state.year || 'ทุกปี')}${val('eu') ? ' • ' + esc(val('eu')) : ''} • ระบบ Audit Flow</div></div>
+      <div style="font-size:12px;color:#64748b;text-align:right">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')}<br>ผู้จัดทำ: ${esc(state.user.name)}</div></div>
+    <div style="font-weight:700;font-size:15px;margin:6px 0">1. สรุปผลแยกตามหน่วยรับตรวจ</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px"><thead><tr><th style="${th}">หน่วยรับตรวจ</th><th style="${th}">ทั้งหมด</th><th style="${th}">เสร็จสิ้น</th><th style="${th}">ดำเนินการ</th><th style="${th}">ส่งตรวจสอบ</th><th style="${th}">ตีกลับ</th><th style="${th}">เกินกำหนด</th><th style="${th}">% สำเร็จ</th></tr></thead>
+    <tbody>${rows.map(sr).join('')}${sr(total).replace('<tr>', '<tr style="background:#eff6ff;font-weight:700">')}</tbody></table>
+    <div style="font-weight:700;font-size:15px;margin:6px 0">2. รายละเอียดข้อเสนอแนะ</div>
+    <table style="width:100%;border-collapse:collapse"><thead><tr><th style="${th};width:30px">#</th><th style="${th};width:80px">รหัส</th><th style="${th};width:120px">หน่วยรับตรวจ</th><th style="${th}">สิ่งที่ตรวจพบ</th><th style="${th}">ข้อเสนอแนะ</th><th style="${th}">ผลการแก้ไข</th><th style="${th};width:85px">กำหนดเสร็จ</th><th style="${th};width:95px">สถานะ</th></tr></thead>
+    <tbody>${list.map((f,i) => `<tr style="page-break-inside:avoid${i%2?';background:#f8fafc':''}"><td style="${td};text-align:center">${i+1}</td><td style="${td}">${esc(f.code)}</td><td style="${td}">${esc(f.unit)}</td><td style="${td}">${esc(f.finding)}</td><td style="${td}">${esc(f.recommendation)}</td><td style="${td}">${esc(f.response) || '-'}</td><td style="${td};text-align:center">${thDate(f.dueDate)}</td><td style="${td};text-align:center;color:${STATUS_META[effStatus(f)].color};font-weight:600">${effStatus(f)}</td></tr>`).join('')}</tbody></table>
+    <div style="display:flex;justify-content:flex-end;margin-top:40px;page-break-inside:avoid"><div style="text-align:center;width:300px">ลงชื่อ ..................................................<br>(..................................................)<br>ผู้ตรวจสอบภายใน</div></div>
+    <div style="margin-top:20px;font-size:10px;color:#94a3b8;text-align:center">Audit Flow Version.1 • พัฒนาโดย นายคามิน ธนากิจธิติ</div></div>`;
+}
+async function exportPDF() {
+  const list = exportList(); if (!list.length) return toast('ไม่มีข้อมูลสำหรับส่งออก', 'warn');
+  const el = document.createElement('div'); el.innerHTML = buildReportHTML(list);
+  await run(() => html2pdf().set({ margin:8, filename:`AuditFlow_Report_${stamp()}.pdf`, image:{ type:'jpeg', quality:0.96 },
+    html2canvas:{ scale:2, useCORS:true }, jsPDF:{ unit:'mm', format:'a4', orientation:'landscape' }, pagebreak:{ mode:['css','legacy'], avoid:'tr' } }).from(el).save().then(() => true));
+  toast('ดาวน์โหลดไฟล์ PDF เรียบร้อย');
+}
+function printReport() {
+  const list = exportList(); if (!list.length) return toast('ไม่มีข้อมูลสำหรับพิมพ์', 'warn');
+  const w = window.open('', '_blank'); if (!w) return toast('กรุณาอนุญาต Pop-up เพื่อพิมพ์รายงาน', 'warn');
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>รายงานสรุปผล Audit Flow</title><link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet"><style>@page{size:A4 landscape;margin:10mm}body{margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style></head><body>${buildReportHTML(list)}</body></html>`);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 900);
+}
+
+/* ======================================================================
+   7) USER ROLES & PERMISSIONS
+   ====================================================================== */
+PAGES.users = () => {
+  const ok = '<i class="fa-solid fa-check text-emerald-600"></i>', no = '<i class="fa-solid fa-xmark text-slate-300"></i>';
+  const perm = [['ดูแดชบอร์ด', ok, ok, ok], ['จัดการรายงาน / ข้อเสนอแนะ', ok, 'ดูได้', no], ['บันทึกข้อสั่งการผู้บริหาร', ok, ok, no], ['บันทึกผลการแก้ไข / แนบหลักฐาน', ok, no, 'หน่วยตน'], ['ประเมินผล / ปิดประเด็น', ok, no, no], ['ส่งออก PDF / Excel', ok, ok, 'หน่วยตน'], ['จัดการผู้ใช้งาน', ok, no, no]];
+  return `<div class="grid xl:grid-cols-3 gap-6">
+  <div class="xl:col-span-2 glass rounded-3xl p-5 overflow-x-auto">
+    <div class="flex items-center justify-between mb-2"><h3 class="font-bold text-blue-950"><i class="fa-solid fa-users mr-2 text-blue-600"></i>ผู้ใช้งานระบบ (${state.users.length})</h3>
+    <button class="btn btn-primary" onclick="openUserForm()"><i class="fa-solid fa-user-plus"></i> เพิ่มผู้ใช้</button></div>
+    <table class="tbl"><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th><th>บทบาท</th><th>หน่วยงาน</th><th>อีเมล</th><th>สถานะ</th><th class="text-right">จัดการ</th></tr></thead><tbody>
+    ${state.users.map(u => `<tr><td class="font-semibold">${esc(u.username)}</td><td class="whitespace-nowrap">${esc(u.name)}</td>
+      <td><span class="px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${ROLE[u.role]?.cls || ''}">${ROLE[u.role]?.label || esc(u.role)}</span></td>
+      <td class="whitespace-nowrap">${esc(u.unit)}</td><td class="text-sm">${esc(u.email) || '-'}</td>
+      <td>${isActive(u) ? '<span class="text-emerald-600 text-sm">ใช้งาน</span>' : '<span class="text-slate-400 text-sm">ระงับ</span>'}</td>
+      <td class="text-right whitespace-nowrap space-x-1">${ib('fa-pen','แก้ไข',`openUserForm('${esc(u.username)}')`,'amber')}${ib('fa-trash','ลบ',`delUser('${esc(u.username)}')`,'rose')}</td></tr>`).join('')}
+    </tbody></table></div>
+  <div class="space-y-6">
+    <div class="glass rounded-3xl p-5"><h3 class="font-bold text-blue-950 mb-3"><i class="fa-solid fa-key mr-2 text-blue-600"></i>ตารางสิทธิ์การใช้งาน</h3>
+      <table class="w-full text-sm"><thead><tr class="text-slate-500 text-xs"><th class="text-left py-1">สิทธิ์</th><th>Admin</th><th>ผู้บริหาร</th><th>หน่วยรับตรวจ</th></tr></thead>
+      <tbody>${perm.map(r => `<tr class="border-t border-slate-200/70"><td class="py-2">${r[0]}</td>${r.slice(1).map(c => `<td class="text-center text-xs">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="glass rounded-3xl p-5"><h3 class="font-bold text-blue-950 mb-2"><i class="fa-solid fa-envelope-circle-check mr-2 text-blue-600"></i>ระบบแจ้งเตือนอัตโนมัติ</h3>
+      <p class="text-sm text-slate-600">Daily Auto-Scan ตรวจรายการใกล้ครบกำหนด (≤10 วัน) และเกินกำหนด แล้วส่งอีเมลถึงหน่วยรับตรวจและผู้ตรวจสอบทุกวันเวลา 08:00 น.</p>
+      <button class="btn btn-ghost w-full mt-3" onclick="runScan()"><i class="fa-solid fa-radar"></i> สแกนและส่งอีเมลทันที</button></div>
+  </div></div>`;
+};
+function openUserForm(username) {
+  const u = username ? state.users.find(x => x.username === username) : { role:'auditee', active:true };
+  openModal(`${modalHead('fa-user-shield', username ? 'แก้ไขผู้ใช้งาน' : 'เพิ่มผู้ใช้งาน')}
+  <form onsubmit="saveUser(event,${username ? 'false' : 'true'})" class="space-y-4"><div class="grid md:grid-cols-2 gap-4">
+    ${field('ชื่อผู้ใช้ *', `<input name="username" required class="inp" value="${esc(u.username)}" ${username ? 'readonly style="background:#f1f5f9"' : ''}>`)}
+    ${field(username ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : 'รหัสผ่าน *', `<input name="password" type="password" class="inp" ${username ? '' : 'required'}>`)}
+    ${field('ชื่อ-สกุล *', `<input name="name" required class="inp" value="${esc(u.name)}">`)}
+    ${field('บทบาท *', `<select name="role" class="inp">${Object.entries(ROLE).map(([k,v]) => `<option value="${k}" ${k===u.role?'selected':''}>${v.label}</option>`).join('')}</select>`)}
+    ${field('หน่วยงาน *', `<input name="unit" required list="unitList" class="inp" value="${esc(u.unit)}">`)}
+    ${field('อีเมล (สำหรับแจ้งเตือน)', `<input name="email" type="email" class="inp" value="${esc(u.email)}">`)}
+    ${field('สถานะ', `<select name="active" class="inp"><option value="TRUE">ใช้งาน</option><option value="FALSE" ${!isActive(u)?'selected':''}>ระงับการใช้งาน</option></select>`)}
+  </div>${formBtns()}</form>`, 'max-w-2xl');
+}
+async function saveUser(e, isNew) {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target)); data.isNew = isNew;
+  if (await run(() => api('saveUser', { data }))) { closeModal(); toast('บันทึกผู้ใช้งานเรียบร้อย'); await reload(); }
+}
+async function delUser(username) {
+  if (!confirm(`ยืนยันการลบผู้ใช้ "${username}"?`)) return;
+  if (await run(() => api('deleteUser', { data:{ username } }))) { toast('ลบผู้ใช้งานเรียบร้อย'); await reload(); }
+}
+async function runScan() {
+  const r = await run(() => api('runScan'));
+  if (r) toast(`ใกล้ครบกำหนด ${r.near} • เกินกำหนด ${r.over} • ส่งอีเมล ${r.sent} ฉบับ`, 'info');
+}
+
+/* ---------------- Init ---------------- */
+window.addEventListener('DOMContentLoaded', async () => {
+  Chart.defaults.font.family = "'Sarabun','Noto Sans Thai',sans-serif"; Chart.defaults.color = '#475569';
+  localStorage.removeItem('af_api'); // ล้างค่าการเชื่อมต่อเดิมที่อาจค้างจากเวอร์ชันก่อน
+  const saved = sessionStorage.getItem('af_auth');
+  if (saved) {
+    state.auth = JSON.parse(saved);
+    const u = await run(() => api('login'));
+    if (u) { state.user = u; return enterApp(); }
+    sessionStorage.removeItem('af_auth'); state.auth = null;
+  }
+  showLogin();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>
